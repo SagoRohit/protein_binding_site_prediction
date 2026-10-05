@@ -1,0 +1,8 @@
+biopython>=1.81
+numpy
+scipy
+pandas
+requests
+tqdm
+pytest
+# external binary (not pip): MMseqs2  -> conda install -c bioconda mmseqs2
