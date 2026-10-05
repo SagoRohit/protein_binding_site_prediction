@@ -1,0 +1,29 @@
+Let's build this hands-on, in real code, using the actual 1BRS structure (barnase–barstar complex — a classic PPI benchmark). I'll fetch the real file, parse it with BioPython, compute the real distance/contact matrix, derive interface labels, then wrap it into a PyTorch Geometric graph — running each step so you see real output, not toy numbers.
+
+First, let me get the actual 1BRS coordinates (RCSB's own domain isn't reachable from this sandbox, so I'll find a mirror).Good — BioPython's in, though this sandbox has very limited disk space, so I couldn't get a full PyTorch install working here (explained more below). Here's the plan, and I'll run each piece live so you see real output, not just talk:
+
+**Step 1 — the raw PDB format itself**
+
+Before parsing anything with a library, you should be able to read a `ATOM` line by eye. Let me hand-build a tiny 2-chain toy structure (correct fixed-column PDB format) so we can see BioPython turn text into objects, then we'll do the same thing on the real 1BRS.The PDB format is column-fixed, not whitespace-delimited — that matters:
+
+| Columns | Field | Example |
+|---|---|---|
+| 1–6 | Record type | `ATOM` |
+| 7–11 | Atom serial | `1` |
+| 13–16 | Atom name | `CA` |
+| 18–20 | Residue name | `ALA` |
+| 22 | **Chain ID** | `A` |
+| 23–26 | Residue seq number | `1` |
+| 31–38 / 39–46 / 47–54 | x / y / z (Å) | `0.000` |
+
+BioPython's parser reads by these column offsets, not by splitting on spaces — that's why a residue name can butt right up against a chain ID with no space and still parse correctly. Now let's parse it and build the real pipeline:This ran clean end to end — let's read what it's telling us, because the numbers aren't arbitrary:
+
+**What just happened, stage by stage:**
+- **Distance matrix**: raw N_A×N_B CA–CA distances in Å, computed by hand with numpy broadcasting (`(NA,1,3) - (1,NB,3) → (NA,NB,3) → norm`). No hidden library call — that *is* the pairwise-distance computation.
+- **Contact matrix**: `dist <= threshold` turns it into 0/1. I used 8 Å here (a common loose "backbone contact" radius). For a real interface definition, tighter thresholds are standard — 4.5–5 Å using *heavy-atom* (all-atom, not just CA) minimum distance is the literature-standard "true interface" cutoff. CA–CA at 8 Å is more forgiving/coarse — good for building a structural *graph*, too loose for labeling "this residue physically touches the partner."
+- **Interface labels**: a residue is interface=1 if its row (or column) in the contact matrix has *any* 1 — i.e., it touches the other chain anywhere. ALA/GLY/SER on chain A came out interface=1 because I placed them geometrically near chain B; LEU didn't.
+- **Intra-chain edge_index**: this is the graph a GNN would actually be given at inference time — each chain's *own* structural contact graph (not the cross-chain one, since predicting an unknown interface means you don't get to see cross-chain contacts as input).
+
+One honest limitation: this sandbox is extremely low on disk space, so a real PyTorch install broke partway through — I couldn't execute `build_pyg_data()` live. The code is still standard, correct `torch_geometric.data.Data` usage (I've left it in the script) — run it wherever you have `pip install torch torch_geometric` working (Colab is the easiest zero-setup option).
+
+**Next step — the real thing.** I can't reach RCSB directly from this sandbox's network, so upload **1BRS.pdb** and I'll rerun this exact pipeline on real barnase–barstar data live:To get 1BRS: fastest is `wget https://files.rcsb.org/download/1BRS.pdb` on your own machine (or the RCSB page directly), then drop it here. Once you upload it, I'll swap it into `parse_structure()`, and we'll look at real things this toy can't show you — like the difference between CA-only vs heavy-atom contact definitions, why 1BRS has 6 chains (3 copies of the complex in the asymmetric unit) so you have to pick the right chain pair, and how many residues actually end up on the interface for a real 110-residue/89-residue pair.
