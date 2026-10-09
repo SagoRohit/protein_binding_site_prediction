@@ -1,4 +1,4 @@
-"""Step 2: download biological assembly 1 (mmCIF) for every selected entry (parallel, resumable)."""
+"""Step 2b: download biological assembly 1 (mmCIF) for every selected entry (parallel, resumable)."""
 import argparse
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -15,7 +15,7 @@ ap.add_argument("--workers", type=int, default=8)
 ap.add_argument("--limit", type=int, default=0, help="debug: only first N entries")
 a = ap.parse_args()
 
-ids = pd.read_csv(os.path.join(a.data, "entries.tsv"), sep="\t").pdb_id.tolist()
+ids = pd.read_csv(os.path.join(a.data, "selected_entries.tsv"), sep="\t").pdb_id.tolist()
 if a.limit:
     ids = ids[:a.limit]
 

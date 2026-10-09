@@ -11,6 +11,10 @@ class Config:
     post_end: str = "2024-06-21"         # MPBind Dataset2 end date -> temporal test set is [pre_cutoff, post_end]
     assembly_id: int = 1                 # first biological assembly only (crystal contacts are not interfaces)
 
+    # ---- cluster-first download (step 2) ----
+    cover_per_cluster: int = 2           # download enough entries so every 30% cluster is covered by this many entries
+    seqres_len_slack: float = 1.25       # SEQRES length may exceed max_len (tags/unmodelled); final length filter is on modelled residues
+
     # ---- chain selection ----
     min_len: int = 48                    # MPBind min residues
     max_len: int = 1000                  # ~MPBind 8192-atom cap; also fits ESM-style 1022 limit

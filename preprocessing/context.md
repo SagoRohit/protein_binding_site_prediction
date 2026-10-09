@@ -34,7 +34,9 @@ preprocessing/
   context.md                 <- this file
   run_all.sh                 <- runs steps 01-05
   01_select_entries.py       wwPDB entries.idx -> data/entries.tsv (resolution/method/date, era pre|post)
-  02_download_assemblies.py  assembly1 mmCIF from files.wwpdb.org (parallel, resumable)
+  02_select_candidates.py    CLUSTER-FIRST: cluster all SEQRES sequences (30 %), greedy set cover -> data/selected_entries.tsv
+                             (only these entries get downloaded, instead of the whole filtered PDB)
+  02_download_assemblies.py  assembly1 mmCIF from files.wwpdb.org for selected entries (parallel, resumable)
   03_extract_chains.py       clean chains + 5 Å labels -> data/chains/<pdb>_<chain>.npz, data/chains.tsv
                              (--local DIR: run on any local pdb/cif files)
   04_cluster_split.py        MMseqs2 cluster, leakage-free splits -> data/splits.tsv, data/{train,val,test,test_temporal}.txt
@@ -47,12 +49,26 @@ Per-chain `.npz` (architecture-agnostic): `seq`, `resseq`, `icode`, `bb` (L,4,3:
 (L,3; side-chain centroid), `label` (L,) int8.
 Usage: `pip install -r requirements.txt`, install MMseqs2 (`conda install -c bioconda mmseqs2`), then `./run_all.sh`.
 
+## Cluster-first download
+Downloading every filtered PDB entry (probably >100k) is wasteful because step 4 keeps ~1 chain per cluster anyway. Step 02a therefore
+clusters the SEQRES sequences first and picks, by greedy set cover, the fewest entries (preferring multi-chain entries, then better
+resolution) so each 30 % cluster is covered by `cover_per_cluster` (=2) entries. Chains in a downloaded entry that belong to other
+clusters are kept too; step 4 does the final dedup on the modelled chains, so the 02a selection can only affect cost, not the leakage guarantees.
+Post-era sequences similar to any pre-era sequence are skipped already here.
+Caveat: SEQRES chain IDs are not used downstream (assembly files use label_asym_id), selection is by entry only.
+
+## Running on Kaggle
+Internet must be ON (Settings sidebar). Clone with `git clone --depth 1 --filter=blob:none --sparse -b claude/preprocessing-pipeline <repo>`
+then `git sparse-checkout set preprocessing`; `pip install biopython scipy pandas requests tqdm pytest`; download the static MMseqs2 binary
+(`https://github.com/soedinglab/MMseqs2/releases/latest/download/mmseqs-linux-avx2.tar.gz`) and put `mmseqs/bin` on PATH; then `bash run_all.sh`.
+Save `data/` (without `data/raw`) as a Kaggle Dataset / zip before the session ends.
+
 ## Status (honest)
-- Code written; unit tests pass (5/5). On `code/1BRS.pdb` the labels give ~19–20 interface residues per barstar chain, matching the
+- Code written; unit tests pass (8/8, incl. the cluster-first set cover). `02_select_candidates.py` verified on a synthetic seqres + entries table with real MMseqs2 (41 clusters covered twice by 41 entries instead of ~82). On `code/1BRS.pdb` the labels give ~19–20 interface residues per barstar chain, matching the
   literature for barnase–barstar. mmCIF (.cif.gz) parsing path verified on a converted copy of 1BRS.
 - `04_cluster_split.py` verified end-to-end with real MMseqs2 on a **synthetic** table (homolog families + post-era chains): families
   never straddle splits, homologous post-era chains removed.
-- **NOT yet run on the real PDB**: the sandbox this was written in cannot reach wwPDB/RCSB. Steps 01–02 (download) are therefore
+- **NOT yet run on the real PDB**: the sandbox this was written in cannot reach wwPDB/RCSB. Steps 01, 02a (seqres download) and 02b (assembly download) are therefore
   untested against the live servers, and the final dataset size / positive rate are unknown. First thing to do on a machine with internet:
   run `./run_all.sh` (try `python 02_download_assemblies.py --limit 200` first), inspect `data/stats.tsv`.
 - The older `code/pipeline.py` (CA–CA 8 Å labels, toy graph) is superseded for labelling: standard is 5 Å heavy-atom.
