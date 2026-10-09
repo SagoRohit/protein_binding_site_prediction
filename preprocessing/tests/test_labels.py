@@ -41,6 +41,7 @@ def _brs():
     return load_structure(os.path.join(REPO, "code", "1BRS.pdb"))
 
 
+@pytest.mark.skipif(not os.path.exists(os.path.join(REPO, "code", "1BRS.pdb")), reason="1BRS.pdb missing")
 def test_virtual_cb_matches_real_cb():
     from Bio.PDB.Polypeptide import is_aa
     errs = []
