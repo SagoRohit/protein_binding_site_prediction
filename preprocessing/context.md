@@ -68,9 +68,23 @@ Save `data/` (without `data/raw`) as a Kaggle Dataset / zip before the session e
   literature for barnase–barstar. mmCIF (.cif.gz) parsing path verified on a converted copy of 1BRS.
 - `04_cluster_split.py` verified end-to-end with real MMseqs2 on a **synthetic** table (homolog families + post-era chains): families
   never straddle splits, homologous post-era chains removed.
-- **NOT yet run on the real PDB**: the sandbox this was written in cannot reach wwPDB/RCSB. Steps 01, 02a (seqres download) and 02b (assembly download) are therefore
-  untested against the live servers, and the final dataset size / positive rate are unknown. First thing to do on a machine with internet:
-  run `./run_all.sh` (try `python 02_download_assemblies.py --limit 200` first), inspect `data/stats.tsv`.
+- **Full run completed on Kaggle (2026-10)** (~4.5 h: download 1 h, extraction 2.7 h). Funnel: 35,182 entries selected
+  (24,329 pre-era clusters, 2,818 post-era clusters) -> 83,993 extracted chains from 21,113 entries (111 assemblies too large, 1 parse error)
+  -> after 30 % dedup/split:
+
+  | split | chains | entries | residues | positive rate |
+  |---|---|---|---|---|
+  | train | 10,602 | 9,060 | 2.46 M | 0.219 |
+  | val | 1,761 | 1,679 | 0.42 M | 0.207 |
+  | test | 1,696 | 1,621 | 0.41 M | 0.216 |
+  | test_temporal | 1,989 | 1,220 | 0.52 M | 0.279 |
+
+  Total 16,048 chains. Median length ~190-200, max <=999. Notes: (a) the train-leak re-search removed 511 val / 516 test chains
+  (~22 %), so the realised split is ~75/12.5/12 rather than 70/15/15 -- greedy clustering at 80 % coverage does leak remote homologs, the
+  safety net is needed; (b) test_temporal has a higher positive rate / interface fraction (0.28 / 0.36 vs ~0.22 / 0.27) -- newer entries contain more
+  large (cryo-EM) complexes, i.e. a genuine distribution shift, report results on it separately; (c) many entries contribute different
+  (<30 % identity) chains to more than one split (e.g. 307 test/train) -- same as PeSTo/MPBind, fine for unpartnered single-chain prediction.
+  The generated data (`data/`) is NOT in git; it lives in the Kaggle output / Dataset `ppi_dataset.zip`.
 - The older `code/pipeline.py` (CA–CA 8 Å labels, toy graph) is superseded for labelling: standard is 5 Å heavy-atom.
 
 ## Known simplifications / things to revisit
@@ -80,8 +94,7 @@ Save `data/` (without `data/raw`) as a Kaggle Dataset / zip before the session e
 - Large complexes (> 250k atoms) are skipped.
 
 ## Next steps
-1. Run on real data on a networked machine; check size (target roughly 5–15k chains), positive rate (PPI typically ~10–20 % of residues),
-   split sizes; adjust `max_resolution` / `members_per_cluster` if needed.
+1. ~~Run on real data~~ (done, see Status). Decide whether 10.6k training chains is enough; if not raise `members_per_cluster` (needs a re-run).
 2. Feature stage (separate step, reads the `.npz` files): ESM-2 (or ProtTrans) embeddings, RSA/SASA, DSSP, torsions, graph (kNN/radius,
    e.g. MPBind uses CA ≤ 15 Å).
 3. Baselines before the novel model: sequence-only (ESM + MLP), then ESM + plain geometric GNN (this is “M0” in the proposal ladder).
